@@ -5,60 +5,79 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            settingsGroup("外观") {
-                HStack(spacing: 14) {
-                    ForEach(CalendarTheme.allCases) { theme in
-                        ThemeOptionCard(
-                            theme: theme,
-                            isSelected: model.settings.calendarTheme == theme
-                        ) {
-                            model.settings.calendarTheme = theme
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                settingsGroup("外观") {
+                    HStack(spacing: 14) {
+                        ForEach(CalendarTheme.allCases) { theme in
+                            ThemeOptionCard(
+                                theme: theme,
+                                isSelected: model.settings.calendarTheme == theme
+                            ) {
+                                model.settings.calendarTheme = theme
+                            }
                         }
                     }
                 }
-            }
 
-            settingsGroup("状态栏显示") {
-                Toggle("显示图标", isOn: $model.settings.showsIcon)
-                Toggle("显示年份", isOn: $model.settings.showsYear)
-                Toggle("显示月份", isOn: $model.settings.showsMonth)
-                Toggle("显示日期", isOn: $model.settings.showsDay)
-                Toggle("显示星期", isOn: $model.settings.showsWeekday)
-            }
+                settingsGroup("性能") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker("", selection: $model.settings.panelReleaseDelay) {
+                            ForEach(PanelReleaseDelay.allCases) { delay in
+                                Text(delay.displayName)
+                                    .tag(delay)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
 
-            settingsGroup("节假日数据") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("订阅地址")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-
-                    TextField("订阅地址", text: $model.settings.holidaySourceURL)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                HStack {
-                    Button("同步") {
-                        model.syncHolidays()
+                        Text(model.settings.panelReleaseDelay.detail)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderedProminent)
-
-                    Text(syncText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(syncColor)
-
-                    Spacer()
                 }
 
-                if let lastSyncedAt = model.holidayStore.lastSyncedAt {
-                    Text("上次同步：\(lastSyncedAt.formatted(date: .numeric, time: .shortened))")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                settingsGroup("状态栏显示") {
+                    Toggle("显示图标", isOn: $model.settings.showsIcon)
+                    Toggle("显示年份", isOn: $model.settings.showsYear)
+                    Toggle("显示月份", isOn: $model.settings.showsMonth)
+                    Toggle("显示日期", isOn: $model.settings.showsDay)
+                    Toggle("显示星期", isOn: $model.settings.showsWeekday)
+                }
+
+                settingsGroup("节假日数据") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("订阅地址")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+
+                        TextField("订阅地址", text: $model.settings.holidaySourceURL)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    HStack {
+                        Button("同步") {
+                            model.syncHolidays()
+                        }
+                        .buttonStyle(.borderedProminent)
+
+                        Text(syncText)
+                            .font(.system(size: 12))
+                            .foregroundStyle(syncColor)
+
+                        Spacer()
+                    }
+
+                    if let lastSyncedAt = model.holidayStore.lastSyncedAt {
+                        Text("上次同步：\(lastSyncedAt.formatted(date: .numeric, time: .shortened))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            .padding(24)
         }
-        .padding(24)
-        .frame(width: 440)
+        .frame(width: 440, height: 440)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 

@@ -10,13 +10,32 @@ struct CalendarPanelView: View {
     @State private var isDateControlHovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 10) {
+                header
 
-            MonthCalendarGrid()
+                MonthCalendarGrid()
+            }
+            .zIndex(0)
+
+            if isDateEditorPresented {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            isDateEditorPresented = false
+                        }
+                    }
+                    .zIndex(1)
+
+                inlineDateEditor
+                    .offset(x: 0, y: 82)
+                    .zIndex(2)
+                    .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .topLeading)))
+            }
         }
         .padding(12)
-        .frame(width: 456)
+        .frame(width: 456, height: 448, alignment: .topLeading)
         .environment(\.colorScheme, .light)
         .background(Color.clear)
     }
@@ -43,7 +62,7 @@ struct CalendarPanelView: View {
 
                 Button {
                     withAnimation(.easeOut(duration: 0.16)) {
-                        isDateEditorPresented = true
+                        isDateEditorPresented.toggle()
                     }
                 } label: {
                     HStack(spacing: 5) {
@@ -64,10 +83,6 @@ struct CalendarPanelView: View {
                 }
                 .buttonStyle(.plain)
                 .pointingHandOnHover($isDateControlHovering)
-                .popover(isPresented: $isDateEditorPresented, arrowEdge: .top) {
-                    YearMonthEditorView()
-                        .environmentObject(model)
-                }
             }
 
             Spacer()
@@ -83,6 +98,33 @@ struct CalendarPanelView: View {
                 }
                 .frame(maxHeight: 74, alignment: .center)
             }
+        }
+    }
+
+    private var inlineDateEditor: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PanelArrow()
+                .fill(.ultraThinMaterial)
+                .frame(width: 24, height: 10)
+                .padding(.leading, 22)
+                .overlay(alignment: .leading) {
+                    PanelArrow()
+                        .stroke(Color.black.opacity(0.12), lineWidth: 0.7)
+                        .frame(width: 24, height: 10)
+                        .padding(.leading, 22)
+                }
+
+            YearMonthEditorView()
+                .environmentObject(model)
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
+                .background(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.black.opacity(0.14), lineWidth: 0.8)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 8)
         }
     }
 
@@ -135,6 +177,17 @@ struct CalendarPanelView: View {
     }
 }
 
+private struct PanelArrow: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 private struct TodayButton: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
@@ -157,23 +210,27 @@ private struct TodayButton: View {
 }
 
 @MainActor
-final class SettingsWindowPresenter {
+final class SettingsWindowPresenter: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowPresenter()
 
     private var window: NSWindow?
 
     func show(model: DaysModel) {
-        if let window {
-            window.makeKeyAndOrderFront(nil)
+        if let window, window.isVisible {
             NSApp.activate(ignoringOtherApps: true)
+            window.level = .floating
+            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
             return
+        } else if window != nil {
+            releaseSettingsWindow()
         }
 
         let view = SettingsView()
             .environmentObject(model)
         let hostingView = NSHostingView(rootView: view)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 360),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 440),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -181,10 +238,33 @@ final class SettingsWindowPresenter {
         window.title = "Days 设置"
         window.contentView = hostingView
         window.center()
+        window.level = .floating
+        window.delegate = self
         window.isReleasedWhenClosed = false
-        window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    nonisolated func windowWillClose(_ notification: Notification) {
+        Task { @MainActor in
+            guard notification.object as AnyObject === self.window else {
+                return
+            }
+
+            self.releaseSettingsWindow()
+        }
+    }
+
+    private func releaseSettingsWindow() {
+        guard let window else {
+            return
+        }
+
+        window.delegate = nil
+        window.contentView = nil
+        self.window = nil
     }
 }
 

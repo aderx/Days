@@ -88,7 +88,7 @@ private struct DayCellView: View {
                 }
             }
             .padding(6)
-            .frame(maxWidth: .infinity, minHeight: 54, maxHeight: 54, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 47, maxHeight: 47, alignment: .topLeading)
             .background(background)
             .overlay {
                 Rectangle()

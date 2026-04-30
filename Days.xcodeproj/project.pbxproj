@@ -180,10 +180,10 @@
 			};
 			buildConfigurationList = 7C0080012D9E000100000001 /* Build configuration list for PBXProject "Days" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = zh-Hans;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				zh-Hans,
+				"zh-Hans",
 				en,
 				Base,
 			);
@@ -360,6 +360,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = SV95F32973;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Days;
@@ -384,6 +385,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = SV95F32973;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Days;
