@@ -23,6 +23,8 @@
 		7C00100E2D9E000100000001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C00200E2D9E000100000001 /* SettingsView.swift */; };
 		7C00100F2D9E000100000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7C00200F2D9E000100000001 /* Assets.xcassets */; };
 		7C0010102D9E000100000001 /* SeedHolidays.ics in Resources */ = {isa = PBXBuildFile; fileRef = 7C0020102D9E000100000001 /* SeedHolidays.ics */; };
+		7C0010112D9E000100000001 /* DaysIcon64.png in Resources */ = {isa = PBXBuildFile; fileRef = 7C0020132D9E000100000001 /* DaysIcon64.png */; };
+		7C0010122D9E000100000001 /* DaysIcon1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 7C0020142D9E000100000001 /* DaysIcon1024.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +46,8 @@
 		7C0020102D9E000100000001 /* SeedHolidays.ics */ = {isa = PBXFileReference; lastKnownFileType = text; path = SeedHolidays.ics; sourceTree = "<group>"; };
 		7C0020112D9E000100000001 /* Days.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Days.entitlements; sourceTree = "<group>"; };
 		7C0020122D9E000100000001 /* Days.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Days.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7C0020132D9E000100000001 /* DaysIcon64.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DaysIcon64.png; sourceTree = "<group>"; };
+		7C0020142D9E000100000001 /* DaysIcon1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = DaysIcon1024.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +129,8 @@
 			isa = PBXGroup;
 			children = (
 				7C0020102D9E000100000001 /* SeedHolidays.ics */,
+				7C0020132D9E000100000001 /* DaysIcon64.png */,
+				7C0020142D9E000100000001 /* DaysIcon1024.png */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -198,6 +204,8 @@
 			files = (
 				7C00100F2D9E000100000001 /* Assets.xcassets in Resources */,
 				7C0010102D9E000100000001 /* SeedHolidays.ics in Resources */,
+				7C0010112D9E000100000001 /* DaysIcon64.png in Resources */,
+				7C0010122D9E000100000001 /* DaysIcon1024.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -416,4 +424,3 @@
 	};
 	rootObject = 7C0060012D9E000100000001 /* Project object */;
 }
-
