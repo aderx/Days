@@ -6,6 +6,15 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            settingsGroup("外观") {
+                Picker("日历主题", selection: $model.settings.calendarTheme) {
+                    ForEach(CalendarTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
             settingsGroup("状态栏显示") {
                 Toggle("显示图标", isOn: $model.settings.showsIcon)
                 Toggle("显示年份", isOn: $model.settings.showsYear)

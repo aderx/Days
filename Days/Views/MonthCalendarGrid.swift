@@ -24,7 +24,8 @@ struct MonthCalendarGrid: View {
                         day: day,
                         holidays: model.holidays(on: day.date),
                         isSelected: CalendarMath.isSameDay(day.date, model.selectedDate),
-                        isToday: CalendarMath.isSameDay(day.date, Date())
+                        isToday: CalendarMath.isSameDay(day.date, Date()),
+                        theme: model.settings.calendarTheme
                     ) {
                         model.select(day.date)
                     }
@@ -42,6 +43,7 @@ private struct DayCellView: View {
     let holidays: [Holiday]
     let isSelected: Bool
     let isToday: Bool
+    let theme: CalendarTheme
     let action: () -> Void
 
     private var primaryHoliday: Holiday? {
@@ -79,7 +81,7 @@ private struct DayCellView: View {
                     Text(primaryHoliday.name)
                         .font(.ndMono(8.5))
                         .lineLimit(1)
-                        .foregroundStyle(isSelected ? Color.primary.opacity(0.76) : tagColor(for: primaryHoliday.kind))
+                        .foregroundStyle(holidayTextColor(for: primaryHoliday.kind))
                 } else {
                     Text(" ")
                         .font(.ndMono(8.5))
@@ -90,7 +92,7 @@ private struct DayCellView: View {
             .background(background)
             .overlay {
                 Rectangle()
-                    .stroke(borderColor, lineWidth: isToday || isSelected ? 1.5 : 1)
+                    .stroke(borderColor, lineWidth: borderWidth)
             }
             .opacity(day.isInDisplayedMonth ? 1 : 0.38)
             .animation(.easeOut(duration: 0.14), value: isHovering)
@@ -101,13 +103,48 @@ private struct DayCellView: View {
 
     private var dayColor: Color {
         if isSelected {
-            return Color.primary
+            switch theme {
+            case .classic:
+                return Color.primary
+            case .soft:
+                return day.isInDisplayedMonth ? ND.textDisplay(colorScheme) : ND.textDisabled(colorScheme)
+            }
         }
 
         return day.isInDisplayedMonth ? ND.textDisplay(colorScheme) : ND.textDisabled(colorScheme)
     }
 
     private var background: Color {
+        switch theme {
+        case .classic:
+            return classicBackground
+        case .soft:
+            return softBackground
+        }
+    }
+
+    private var borderColor: Color {
+        switch theme {
+        case .classic:
+            return classicBorderColor
+        case .soft:
+            return softBorderColor
+        }
+    }
+
+    private var borderWidth: CGFloat {
+        switch theme {
+        case .classic:
+            return isToday || isSelected ? 1.5 : 1
+        case .soft:
+            if isSelected || isHovering {
+                return 1.5
+            }
+            return primaryHoliday == nil ? 1 : 0
+        }
+    }
+
+    private var classicBackground: Color {
         if isSelected {
             return selectedFillColor
         }
@@ -130,7 +167,7 @@ private struct DayCellView: View {
         }
     }
 
-    private var borderColor: Color {
+    private var classicBorderColor: Color {
         if isSelected {
             return selectedFillColor
         }
@@ -153,6 +190,53 @@ private struct DayCellView: View {
         return isHovering ? Color.primary.opacity(0.16) : Color.primary.opacity(0.08)
     }
 
+    private var softBackground: Color {
+        if isToday {
+            return hoverFillColor
+        }
+
+        guard let primaryHoliday else {
+            return Color.white.opacity(0.34)
+        }
+
+        switch primaryHoliday.kind {
+        case .holiday:
+            return ND.accent.opacity(0.10)
+        case .workday:
+            return ND.warning.opacity(0.13)
+        case .observance:
+            return Color.white.opacity(0.34)
+        }
+    }
+
+    private var softBorderColor: Color {
+        if let primaryHoliday {
+            if isSelected {
+                return themeColor(for: primaryHoliday.kind)
+            }
+
+            if isHovering {
+                return themeColor(for: primaryHoliday.kind).opacity(0.34)
+            }
+
+            return Color.clear
+        }
+
+        if isSelected {
+            return Color.primary
+        }
+
+        if isHovering {
+            return Color.primary.opacity(0.16)
+        }
+
+        if isToday {
+            return Color.primary.opacity(0.08)
+        }
+
+        return Color.clear
+    }
+
     private var selectedFillColor: Color {
         Color.primary.opacity(0.16)
     }
@@ -162,6 +246,19 @@ private struct DayCellView: View {
     }
 
     private func tagColor(for kind: HolidayKind) -> Color {
+        themeColor(for: kind)
+    }
+
+    private func holidayTextColor(for kind: HolidayKind) -> Color {
+        switch theme {
+        case .classic:
+            return isSelected ? Color.primary.opacity(0.76) : tagColor(for: kind)
+        case .soft:
+            return tagColor(for: kind)
+        }
+    }
+
+    private func themeColor(for kind: HolidayKind) -> Color {
         switch kind {
         case .holiday:
             return ND.accent
