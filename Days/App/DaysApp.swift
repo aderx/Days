@@ -86,6 +86,7 @@ final class StatusBarController: NSObject {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "打开日历", action: #selector(openCalendar), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "关于 Days", action: #selector(openAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出 Days", action: #selector(quit), keyEquivalent: "q"))
 
@@ -110,6 +111,10 @@ final class StatusBarController: NSObject {
 
     @objc private func openSettings() {
         SettingsWindowPresenter.shared.show(model: model)
+    }
+
+    @objc private func openAbout() {
+        AboutWindowPresenter.shared.show()
     }
 
     @objc private func quit() {
@@ -195,6 +200,9 @@ final class StatusBarController: NSObject {
 
     private func closePanel() {
         removePanelEventMonitors()
+        if panel?.isVisible == true {
+            model.goToToday()
+        }
         panel?.orderOut(nil)
         schedulePanelRelease()
     }
@@ -306,6 +314,149 @@ final class StatusBarController: NSObject {
         } else {
             button.image = nil
         }
+    }
+}
+
+@MainActor
+final class AboutWindowPresenter: NSObject, NSWindowDelegate {
+    static let shared = AboutWindowPresenter()
+
+    private let repositoryURL = URL(string: "https://github.com/aderx/Days")!
+    private var window: NSWindow?
+
+    func show() {
+        if let window, window.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            window.level = .floating
+            window.orderFrontRegardless()
+            window.makeKeyAndOrderFront(nil)
+            return
+        } else if window != nil {
+            releaseWindow()
+        }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 300),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "关于 Days"
+        window.contentView = makeContentView()
+        window.center()
+        window.level = .floating
+        window.delegate = self
+        window.isReleasedWhenClosed = false
+        self.window = window
+
+        NSApp.activate(ignoringOtherApps: true)
+        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    nonisolated func windowWillClose(_ notification: Notification) {
+        Task { @MainActor in
+            guard notification.object as AnyObject === self.window else {
+                return
+            }
+
+            self.releaseWindow()
+        }
+    }
+
+    private func releaseWindow() {
+        guard let window else {
+            return
+        }
+
+        window.delegate = nil
+        window.contentView = nil
+        self.window = nil
+    }
+
+    private func makeContentView() -> NSView {
+        let root = NSView()
+        root.wantsLayer = true
+        root.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let iconView = NSImageView()
+        iconView.image = appIcon
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = NSTextField(labelWithString: "Days")
+        title.font = .systemFont(ofSize: 22, weight: .semibold)
+        title.textColor = .labelColor
+
+        let version = NSTextField(labelWithString: "V\(displayVersion)")
+        version.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        version.textColor = .secondaryLabelColor
+
+        let description = NSTextField(labelWithString: "Days 是一个开源的 macOS 状态栏日历程序。")
+        description.font = .systemFont(ofSize: 13)
+        description.textColor = .secondaryLabelColor
+        description.alignment = .center
+        description.maximumNumberOfLines = 2
+
+        let repoButton = NSButton(title: "查看开源地址", target: self, action: #selector(openRepository))
+        repoButton.bezelStyle = .rounded
+
+        let repoText = NSTextField(labelWithString: repositoryURL.absoluteString)
+        repoText.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        repoText.textColor = .tertiaryLabelColor
+        repoText.alignment = .center
+        repoText.lineBreakMode = .byTruncatingMiddle
+
+        stack.addArrangedSubview(iconView)
+        stack.addArrangedSubview(title)
+        stack.addArrangedSubview(version)
+        stack.addArrangedSubview(description)
+        stack.addArrangedSubview(repoButton)
+        stack.addArrangedSubview(repoText)
+        root.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            iconView.widthAnchor.constraint(equalToConstant: 76),
+            iconView.heightAnchor.constraint(equalToConstant: 76),
+            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -28),
+            stack.centerYAnchor.constraint(equalTo: root.centerYAnchor)
+        ])
+
+        return root
+    }
+
+    @objc private func openRepository() {
+        NSWorkspace.shared.open(repositoryURL)
+    }
+
+    private var displayVersion: String {
+        let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+        let parts = raw.split(separator: ".")
+        if parts.count == 2 {
+            return "\(raw).0"
+        }
+        if parts.count == 1 {
+            return "\(raw).0.0"
+        }
+        return raw
+    }
+
+    private var appIcon: NSImage? {
+        if let image = NSImage(named: "AppIcon") {
+            return image
+        }
+
+        guard let url = Bundle.main.url(forResource: "DaysIcon1024", withExtension: "png") else {
+            return NSApp.applicationIconImage
+        }
+        return NSImage(contentsOf: url) ?? NSApp.applicationIconImage
     }
 }
 

@@ -49,6 +49,14 @@ final class DaysModel: ObservableObject {
         CalendarMath.yearMonthUnitText(for: selectedDate)
     }
 
+    var selectedYearTitle: String {
+        CalendarMath.yearUnitText(for: selectedDate)
+    }
+
+    var selectedMonthDayTitle: String {
+        CalendarMath.monthDayUnitText(for: selectedDate)
+    }
+
     var selectedDaySuffixTitle: String {
         "日 \(CalendarMath.weekdayText(for: selectedDate))"
     }

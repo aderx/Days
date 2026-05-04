@@ -52,7 +52,7 @@ private struct DayCellView: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .top) {
                     Text(CalendarMath.dayNumber(for: day.date))
                         .font(.ndMono(21, weight: .medium))
@@ -78,13 +78,15 @@ private struct DayCellView: View {
                 Spacer(minLength: 0)
 
                 if let primaryHoliday {
-                    Text(primaryHoliday.name)
+                    Text(holidayTitle(for: primaryHoliday))
                         .font(.ndMono(8.5))
                         .lineLimit(1)
                         .foregroundStyle(holidayTextColor(for: primaryHoliday.kind))
+                        .padding(.bottom, 8)
                 } else {
                     Text(" ")
                         .font(.ndMono(8.5))
+                        .padding(.bottom, 8)
                 }
             }
             .padding(6)
@@ -256,6 +258,10 @@ private struct DayCellView: View {
         case .soft:
             return tagColor(for: kind)
         }
+    }
+
+    private func holidayTitle(for holiday: Holiday) -> String {
+        holidays.count > 1 ? "\(holiday.name)*" : holiday.name
     }
 
     private func themeColor(for kind: HolidayKind) -> Color {

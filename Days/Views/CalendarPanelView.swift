@@ -41,15 +41,43 @@ struct CalendarPanelView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
-                    Text(model.selectedDayNumber)
-                        .font(.ndDisplay(54))
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
+                    Text(model.selectedMonthDayTitle)
+                        .font(.ndDisplay(40))
                         .foregroundStyle(selectedDayNumberColor)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.78)
                         .fixedSize(horizontal: true, vertical: false)
+
+                }
+
+                HStack(spacing: 6) {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            isDateEditorPresented.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(model.selectedYearTitle)
+                                .font(.ndMono(12))
+                                .foregroundStyle(selectedYearMonthColor)
+
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(dateSwitchIconColor)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(isDateControlHovering ? hoverFill : Color.clear)
+                        .clipShape(Capsule())
+                        .contentShape(Rectangle())
+                        .animation(.easeOut(duration: 0.14), value: isDateControlHovering)
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandOnHover($isDateControlHovering)
+                    .help("切换年月")
 
                     if model.shouldShowTodayShortcut {
                         TodayButton {
@@ -58,78 +86,48 @@ struct CalendarPanelView: View {
                         .help("回到今天")
                     }
                 }
-                .frame(minWidth: 66, alignment: .leading)
-
-                Button {
-                    withAnimation(.easeOut(duration: 0.16)) {
-                        isDateEditorPresented.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(model.selectedYearMonthTitle)
-                            .font(.ndMono(12))
-                            .foregroundStyle(selectedYearMonthColor)
-
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(isDateControlHovering ? ND.textPrimary(colorScheme) : ND.textSecondary(colorScheme))
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(isDateControlHovering ? hoverFill : Color.clear)
-                    .clipShape(Capsule())
-                    .contentShape(Rectangle())
-                    .animation(.easeOut(duration: 0.14), value: isDateControlHovering)
-                }
-                .buttonStyle(.plain)
-                .pointingHandOnHover($isDateControlHovering)
             }
+            .frame(minWidth: 150, minHeight: 70, alignment: .leading)
 
             Spacer()
 
-            if !model.selectedHolidays.isEmpty {
-                VStack(alignment: .trailing, spacing: 4) {
-                    ForEach(model.selectedHolidays.prefix(2)) { holiday in
-                        Text(displayTitle(for: holiday))
-                            .font(.ndMono(12, weight: .medium))
-                            .foregroundStyle(holidayColor(for: holiday.kind))
-                            .lineLimit(1)
-                    }
+            VStack(alignment: .trailing, spacing: 4) {
+                ForEach(model.selectedHolidays.prefix(2)) { holiday in
+                    Text(displayTitle(for: holiday))
+                        .font(.ndMono(12, weight: .medium))
+                        .foregroundStyle(holidayColor(for: holiday.kind))
+                        .lineLimit(1)
                 }
-                .frame(maxHeight: 74, alignment: .center)
             }
+            .frame(width: 120, height: 70, alignment: .center)
         }
+        .frame(height: 70)
     }
 
     private var inlineDateEditor: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            PanelArrow()
+        ZStack(alignment: .topLeading) {
+            DateEditorBubbleShape(arrowHeight: 10, cornerRadius: 18)
                 .fill(.ultraThinMaterial)
-                .frame(width: 24, height: 10)
-                .padding(.leading, 22)
-                .overlay(alignment: .leading) {
-                    PanelArrow()
-                        .stroke(Color.black.opacity(0.12), lineWidth: 0.7)
-                        .frame(width: 24, height: 10)
-                        .padding(.leading, 22)
-                }
-
-            YearMonthEditorView()
-                .environmentObject(model)
-                .padding(.horizontal, 2)
-                .padding(.vertical, 2)
-                .background(.ultraThinMaterial)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    DateEditorBubbleShape(arrowHeight: 10, cornerRadius: 18)
                         .stroke(Color.black.opacity(0.14), lineWidth: 0.8)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 8)
+            
+            YearMonthEditorView()
+                .environmentObject(model)
+                .padding(.top, 10)
         }
+        .fixedSize()
     }
 
     private var hoverFill: Color {
         sharedHoverFill
+    }
+
+    private var dateSwitchIconColor: Color {
+        let base = isDateControlHovering ? ND.textPrimary(colorScheme) : ND.textSecondary(colorScheme)
+        return base.opacity(isDateControlHovering ? 0.68 : 0.48)
     }
 
     private var selectedDayNumberColor: Color {
@@ -188,6 +186,54 @@ private struct PanelArrow: Shape {
     }
 }
 
+private struct DateEditorBubbleShape: Shape {
+    let arrowHeight: CGFloat
+    let cornerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let arrowHalfWidth: CGFloat = 12
+        let arrowPeakX = rect.minX + 34
+        let bodyTop = rect.minY + arrowHeight
+        let radius = min(cornerRadius, rect.width / 2, (rect.height - arrowHeight) / 2)
+
+        var path = Path()
+        path.move(to: CGPoint(x: arrowPeakX, y: rect.minY))
+        path.addCurve(
+            to: CGPoint(x: arrowPeakX + arrowHalfWidth, y: bodyTop),
+            control1: CGPoint(x: arrowPeakX + 5, y: rect.minY),
+            control2: CGPoint(x: arrowPeakX + 7, y: bodyTop)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: bodyTop))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: bodyTop + radius),
+            control: CGPoint(x: rect.maxX, y: bodyTop)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.maxY - radius),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX, y: bodyTop + radius))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + radius, y: bodyTop),
+            control: CGPoint(x: rect.minX, y: bodyTop)
+        )
+        path.addLine(to: CGPoint(x: arrowPeakX - arrowHalfWidth, y: bodyTop))
+        path.addCurve(
+            to: CGPoint(x: arrowPeakX, y: rect.minY),
+            control1: CGPoint(x: arrowPeakX - 7, y: bodyTop),
+            control2: CGPoint(x: arrowPeakX - 5, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
 private struct TodayButton: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
@@ -197,9 +243,9 @@ private struct TodayButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "arrow.uturn.backward")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(ND.textPrimary(colorScheme))
-                .frame(width: 26, height: 24)
+                .frame(width: 18, height: 18)
                 .background(isHovering ? sharedHoverFill : Color.clear)
                 .clipShape(Capsule())
                 .animation(.easeOut(duration: 0.14), value: isHovering)
@@ -324,8 +370,13 @@ private struct YearMonthEditorView: View {
         increment: @escaping () -> Void,
         apply: @escaping () -> Void
     ) -> some View {
-        VStack(spacing: 8) {
-            EditorArrowButton(systemImage: "chevron.up", width: controlWidth, action: increment)
+        VStack(alignment: .leading, spacing: 8) {
+            EditorArrowButton(
+                systemImage: "chevron.up",
+                width: inputWidth + 16,
+                helpText: "增加\(title)",
+                action: increment
+            )
 
             HStack(spacing: 8) {
                 TextField(title, text: text)
@@ -344,8 +395,14 @@ private struct YearMonthEditorView: View {
                     .foregroundStyle(ND.textSecondary(colorScheme))
                     .frame(width: 14, alignment: .leading)
             }
+            .frame(width: controlWidth, alignment: .leading)
 
-            EditorArrowButton(systemImage: "chevron.down", width: controlWidth, action: decrement)
+            EditorArrowButton(
+                systemImage: "chevron.down",
+                width: inputWidth + 16,
+                helpText: "减少\(title)",
+                action: decrement
+            )
         }
         .frame(width: controlWidth)
     }
@@ -380,6 +437,7 @@ private struct EditorArrowButton: View {
 
     let systemImage: String
     let width: CGFloat
+    let helpText: String
     let action: () -> Void
 
     var body: some View {
@@ -394,5 +452,6 @@ private struct EditorArrowButton: View {
         }
         .buttonStyle(.plain)
         .pointingHandOnHover($isHovering)
+        .help(helpText)
     }
 }

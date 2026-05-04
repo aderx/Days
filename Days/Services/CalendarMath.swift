@@ -33,6 +33,11 @@ enum CalendarMath {
         return String(format: "%02d月", month)
     }
 
+    static func monthDayUnitText(for date: Date) -> String {
+        let components = calendar.dateComponents([.month, .day], from: date)
+        return String(format: "%02d月%02d日", components.month ?? 0, components.day ?? 0)
+    }
+
     static func yearMonthUnitText(for date: Date) -> String {
         "\(yearUnitText(for: date))\(monthUnitText(for: date))"
     }
