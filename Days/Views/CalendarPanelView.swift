@@ -1,8 +1,6 @@
 import AppKit
 import SwiftUI
 
-private let sharedHoverFill = Color.primary.opacity(0.10)
-
 struct CalendarPanelView: View {
     @EnvironmentObject private var model: DaysModel
     @Environment(\.colorScheme) private var colorScheme
@@ -22,107 +20,157 @@ struct CalendarPanelView: View {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        withAnimation(.easeOut(duration: 0.14)) {
-                            isDateEditorPresented = false
-                        }
+                        dismissDateEditor()
                     }
                     .zIndex(1)
 
                 inlineDateEditor
-                    .offset(x: 0, y: 82)
+                    .offset(x: 0, y: 84)
                     .zIndex(2)
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .topLeading)))
             }
         }
-        .padding(12)
+        .padding(14)
         .frame(width: 456, height: 448, alignment: .topLeading)
-        .environment(\.colorScheme, .light)
         .background(Color.clear)
+        .environment(\.isGlassSkin, isGlassSkin)
+        .onExitCommand(perform: dismissDateEditor)
+    }
+
+    private var isGlassSkin: Bool {
+        model.settings.panelSkin == .glass && PanelSkin.glassAvailable
     }
 
     private var header: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(model.selectedMonthDayTitle)
-                        .font(.ndDisplay(40))
-                        .foregroundStyle(selectedDayNumberColor)
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.selectedMonthDayTitle)
+                    .font(.ndDisplay(42))
+                    .foregroundStyle(selectedDayNumberColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.18), value: model.selectedMonthDayTitle)
+
+                controlRow
+            }
+            .frame(minWidth: 150, minHeight: 70, alignment: .topLeading)
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 5) {
+                if model.selectedHolidays.isEmpty {
+                    Text(emptyScheduleText)
+                        .font(.ndMono(12))
+                        .foregroundStyle(ND.textDisabled(colorScheme))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                        .fixedSize(horizontal: true, vertical: false)
-
-                }
-
-                HStack(spacing: 6) {
-                    Button {
-                        withAnimation(.easeOut(duration: 0.16)) {
-                            isDateEditorPresented.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(model.selectedYearTitle)
-                                .font(.ndMono(12))
-                                .foregroundStyle(selectedYearMonthColor)
-
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(dateSwitchIconColor)
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(isDateControlHovering ? hoverFill : Color.clear)
-                        .clipShape(Capsule())
-                        .contentShape(Rectangle())
-                        .animation(.easeOut(duration: 0.14), value: isDateControlHovering)
-                    }
-                    .buttonStyle(.plain)
-                    .pointingHandOnHover($isDateControlHovering)
-                    .help("切换年月")
-
-                    if model.shouldShowTodayShortcut {
-                        TodayButton {
-                            model.goToToday()
-                        }
-                        .help("回到今天")
+                        .minimumScaleFactor(0.8)
+                } else {
+                    ForEach(model.selectedHolidays.prefix(3)) { holiday in
+                        HolidayTag(title: displayTitle(for: holiday), color: holidayColor(for: holiday.kind))
                     }
                 }
             }
-            .frame(minWidth: 150, minHeight: 70, alignment: .leading)
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 4) {
-                ForEach(model.selectedHolidays.prefix(2)) { holiday in
-                    Text(displayTitle(for: holiday))
-                        .font(.ndMono(12, weight: .medium))
-                        .foregroundStyle(holidayColor(for: holiday.kind))
-                        .lineLimit(1)
-                }
-            }
-            .frame(width: 120, height: 70, alignment: .center)
+            .frame(width: 140, height: 70, alignment: .topTrailing)
         }
         .frame(height: 70)
     }
 
-    private var inlineDateEditor: some View {
-        ZStack(alignment: .topLeading) {
-            DateEditorBubbleShape(arrowHeight: 10, cornerRadius: 18)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    DateEditorBubbleShape(arrowHeight: 10, cornerRadius: 18)
-                        .stroke(Color.black.opacity(0.14), lineWidth: 0.8)
+    private var controlRow: some View {
+        HStack(spacing: 4) {
+            NavIconButton(systemImage: "chevron.left", help: "上个月") {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    model.changeSelectedMonth(by: -1)
                 }
-                .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 8)
-            
-            YearMonthEditorView()
-                .environmentObject(model)
-                .padding(.top, 10)
+            }
+
+            Button {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    isDateEditorPresented.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(model.selectedYearTitle)
+                        .font(.ndMono(12, weight: .medium))
+                        .foregroundStyle(selectedYearMonthColor)
+
+                    Text(weekdayText)
+                        .font(.ndMono(12))
+                        .foregroundStyle(ND.textSecondary(colorScheme))
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(dateSwitchIconColor)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isDateControlHovering, shape: Capsule())
+                .contentShape(Rectangle())
+                .animation(.easeOut(duration: 0.14), value: isDateControlHovering)
+            }
+            .buttonStyle(.plain)
+            .pointingHandOnHover($isDateControlHovering)
+            .help("切换年月")
+
+            NavIconButton(systemImage: "chevron.right", help: "下个月") {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    model.changeSelectedMonth(by: 1)
+                }
+            }
+
+            if model.shouldShowTodayShortcut {
+                TodayButton {
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        model.goToToday()
+                    }
+                }
+                .help("回到今天")
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+            }
         }
-        .fixedSize()
+        .animation(.easeOut(duration: 0.16), value: model.shouldShowTodayShortcut)
     }
 
-    private var hoverFill: Color {
-        sharedHoverFill
+    private var weekdayText: String {
+        CalendarMath.weekdayText(for: model.selectedDate)
+    }
+
+    private var emptyScheduleText: String {
+        CalendarMath.isSameDay(model.selectedDate, Date()) ? "今天暂时没有安排" : "这天暂时没有安排"
+    }
+
+    @ViewBuilder
+    private var inlineDateEditor: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+        if model.settings.panelSkin == .glass, #available(macOS 26.0, *) {
+            YearMonthEditorView()
+                .environmentObject(model)
+                .glassEffect(.regular.interactive(), in: shape)
+                .fixedSize()
+        } else {
+            YearMonthEditorView()
+                .environmentObject(model)
+                .background {
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .overlay { shape.fill(ND.panelChromeFill(colorScheme)) }
+                        .overlay { shape.stroke(ND.panelStroke(colorScheme), lineWidth: 0.8) }
+                        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.4 : 0.16), radius: 18, x: 0, y: 8)
+                }
+                .fixedSize()
+        }
+    }
+
+    private func dismissDateEditor() {
+        guard isDateEditorPresented else {
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.14)) {
+            isDateEditorPresented = false
+        }
     }
 
     private var dateSwitchIconColor: Color {
@@ -175,67 +223,50 @@ struct CalendarPanelView: View {
     }
 }
 
-private struct PanelArrow: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
+private struct HolidayTag: View {
+    let title: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 1)
+                .fill(color)
+                .frame(width: 3, height: 11)
+            Text(title)
+                .font(.ndMono(12, weight: .medium))
+                .foregroundStyle(color)
+                .lineLimit(1)
+        }
     }
 }
 
-private struct DateEditorBubbleShape: Shape {
-    let arrowHeight: CGFloat
-    let cornerRadius: CGFloat
+private struct NavIconButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @State private var isHovering = false
 
-    func path(in rect: CGRect) -> Path {
-        let arrowHalfWidth: CGFloat = 12
-        let arrowPeakX = rect.minX + 34
-        let bodyTop = rect.minY + arrowHeight
-        let radius = min(cornerRadius, rect.width / 2, (rect.height - arrowHeight) / 2)
+    let systemImage: String
+    let help: String
+    let action: () -> Void
 
-        var path = Path()
-        path.move(to: CGPoint(x: arrowPeakX, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: arrowPeakX + arrowHalfWidth, y: bodyTop),
-            control1: CGPoint(x: arrowPeakX + 5, y: rect.minY),
-            control2: CGPoint(x: arrowPeakX + 7, y: bodyTop)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX - radius, y: bodyTop))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: bodyTop + radius),
-            control: CGPoint(x: rect.maxX, y: bodyTop)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.maxY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.maxY - radius),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX, y: bodyTop + radius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.minX + radius, y: bodyTop),
-            control: CGPoint(x: rect.minX, y: bodyTop)
-        )
-        path.addLine(to: CGPoint(x: arrowPeakX - arrowHalfWidth, y: bodyTop))
-        path.addCurve(
-            to: CGPoint(x: arrowPeakX, y: rect.minY),
-            control1: CGPoint(x: arrowPeakX - 7, y: bodyTop),
-            control2: CGPoint(x: arrowPeakX - 5, y: rect.minY)
-        )
-        path.closeSubpath()
-        return path
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(isHovering ? ND.textPrimary(colorScheme) : ND.textSecondary(colorScheme))
+                .frame(width: 22, height: 22)
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Circle())
+                .animation(.easeOut(duration: 0.14), value: isHovering)
+        }
+        .buttonStyle(.plain)
+        .pointingHandOnHover($isHovering)
+        .help(help)
     }
 }
 
 private struct TodayButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
     @State private var isHovering = false
 
     let action: () -> Void
@@ -245,9 +276,8 @@ private struct TodayButton: View {
             Image(systemName: "arrow.uturn.backward")
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(ND.textPrimary(colorScheme))
-                .frame(width: 18, height: 18)
-                .background(isHovering ? sharedHoverFill : Color.clear)
-                .clipShape(Capsule())
+                .frame(width: 20, height: 20)
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Circle())
                 .animation(.easeOut(duration: 0.14), value: isHovering)
         }
         .buttonStyle(.plain)
@@ -276,7 +306,7 @@ final class SettingsWindowPresenter: NSObject, NSWindowDelegate {
             .environmentObject(model)
         let hostingView = NSHostingView(rootView: view)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 560),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -317,6 +347,7 @@ final class SettingsWindowPresenter: NSObject, NSWindowDelegate {
 private struct YearMonthEditorView: View {
     @EnvironmentObject private var model: DaysModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
     @State private var yearText = ""
     @State private var monthText = ""
 
@@ -387,8 +418,8 @@ private struct YearMonthEditorView: View {
                     .frame(width: inputWidth, height: 30)
                     .onSubmit(apply)
                     .padding(.horizontal, 8)
-                    .background(ND.surface(colorScheme))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .background { editorFieldBackground }
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 Text(title)
                     .font(.ndMono(13, weight: .medium))
@@ -405,6 +436,17 @@ private struct YearMonthEditorView: View {
             )
         }
         .frame(width: controlWidth)
+    }
+
+    @ViewBuilder
+    private var editorFieldBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+
+        if isGlassSkin, #available(macOS 26.0, *) {
+            Color.clear.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            shape.fill(ND.surface(colorScheme))
+        }
     }
 
     private func reload() {
@@ -433,6 +475,7 @@ private struct YearMonthEditorView: View {
 
 private struct EditorArrowButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
     @State private var isHovering = false
 
     let systemImage: String
@@ -446,8 +489,7 @@ private struct EditorArrowButton: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ND.textPrimary(colorScheme))
                 .frame(width: width, height: 22)
-                .background(isHovering ? sharedHoverFill : Color.clear)
-                .clipShape(Capsule())
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Capsule())
                 .animation(.easeOut(duration: 0.14), value: isHovering)
         }
         .buttonStyle(.plain)

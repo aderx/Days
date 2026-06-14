@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum CalendarTheme: String, Codable, CaseIterable, Identifiable {
     case classic
@@ -13,6 +14,61 @@ enum CalendarTheme: String, Codable, CaseIterable, Identifiable {
         case .soft:
             return "清透"
         }
+    }
+}
+
+/// Light/dark override for every Days window.
+enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system:
+            return "跟随系统"
+        case .light:
+            return "浅色"
+        case .dark:
+            return "深色"
+        }
+    }
+
+    /// `nil` follows the system; on macOS this also drives the window's material appearance.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
+/// Material used behind the floating panel.
+enum PanelSkin: String, Codable, CaseIterable, Identifiable {
+    case frosted
+    case glass
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .frosted:
+            return "磨砂"
+        case .glass:
+            return "玻璃"
+        }
+    }
+
+    /// Liquid Glass requires the macOS 26 SDK at runtime.
+    static var glassAvailable: Bool {
+        if #available(macOS 26.0, *) { return true }
+        return false
     }
 }
 
@@ -73,6 +129,8 @@ struct DaysSettings: Codable, Equatable {
     var holidaySourceURL: String
     var calendarTheme: CalendarTheme
     var panelReleaseDelay: PanelReleaseDelay
+    var appearanceMode: AppearanceMode
+    var panelSkin: PanelSkin
 
     static let defaultSourceURL = "https://calendars.icloud.com/holidays/cn_zh.ics/"
 
@@ -84,7 +142,9 @@ struct DaysSettings: Codable, Equatable {
         showsWeekday: false,
         holidaySourceURL: defaultSourceURL,
         calendarTheme: .classic,
-        panelReleaseDelay: .seconds30
+        panelReleaseDelay: .seconds30,
+        appearanceMode: .system,
+        panelSkin: .frosted
     )
 
     enum CodingKeys: String, CodingKey {
@@ -96,6 +156,8 @@ struct DaysSettings: Codable, Equatable {
         case holidaySourceURL
         case calendarTheme
         case panelReleaseDelay
+        case appearanceMode
+        case panelSkin
     }
 
     init(
@@ -106,7 +168,9 @@ struct DaysSettings: Codable, Equatable {
         showsWeekday: Bool,
         holidaySourceURL: String,
         calendarTheme: CalendarTheme,
-        panelReleaseDelay: PanelReleaseDelay
+        panelReleaseDelay: PanelReleaseDelay,
+        appearanceMode: AppearanceMode,
+        panelSkin: PanelSkin
     ) {
         self.showsIcon = showsIcon
         self.showsYear = showsYear
@@ -116,6 +180,8 @@ struct DaysSettings: Codable, Equatable {
         self.holidaySourceURL = holidaySourceURL
         self.calendarTheme = calendarTheme
         self.panelReleaseDelay = panelReleaseDelay
+        self.appearanceMode = appearanceMode
+        self.panelSkin = panelSkin
     }
 
     init(from decoder: Decoder) throws {
@@ -128,5 +194,7 @@ struct DaysSettings: Codable, Equatable {
         holidaySourceURL = try container.decode(String.self, forKey: .holidaySourceURL)
         calendarTheme = try container.decodeIfPresent(CalendarTheme.self, forKey: .calendarTheme) ?? .classic
         panelReleaseDelay = try container.decodeIfPresent(PanelReleaseDelay.self, forKey: .panelReleaseDelay) ?? .seconds30
+        appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode) ?? .system
+        panelSkin = try container.decodeIfPresent(PanelSkin.self, forKey: .panelSkin) ?? .frosted
     }
 }
