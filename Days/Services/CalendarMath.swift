@@ -1,12 +1,19 @@
 import Foundation
 
 enum CalendarMath {
-    static var calendar: Calendar {
+    // Built once and reused. Rebuilding a Calendar on every access (it is hit
+    // dozens of times per grid render) was needless allocation/CPU.
+    static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = Locale(identifier: "zh_CN")
         calendar.timeZone = .current
         calendar.firstWeekday = 2
         return calendar
+    }()
+
+    static func isWeekend(_ date: Date) -> Bool {
+        let weekday = calendar.component(.weekday, from: date)
+        return weekday == 1 || weekday == 7
     }
 
     static func startOfDay(_ date: Date) -> Date {

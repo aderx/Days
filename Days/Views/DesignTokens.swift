@@ -40,6 +40,44 @@ enum ND {
     static let accent = Color(hex: "D71921")
     static let success = Color(hex: "4A9E5C")
     static let warning = Color(hex: "D4A843")
+
+    // MARK: - Adaptive panel chrome
+
+    /// Translucent fill layered over the panel's material to lift it slightly.
+    static func panelChromeFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.24)
+    }
+
+    /// Hairline stroke around the floating panel / popovers.
+    static func panelStroke(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.14)
+    }
+
+    // MARK: - Calendar surfaces
+
+    /// Default day-cell background (a faint card on the frosted panel).
+    static func dayFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.045) : Color.white.opacity(0.46)
+    }
+
+    /// Slightly stronger fill used for observance / neutral-but-marked days.
+    static func dayFillStrong(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.6)
+    }
+
+    /// Subtle shaded band for Saturday/Sunday columns so the weekend stands out.
+    static func weekendFill(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.10) : Color.black.opacity(0.05)
+    }
+
+    /// Hairline divider for data-dense groupings.
+    static func divider(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.07)
+    }
+
+    /// Shared hover wash — neutral, adapts to appearance via `Color.primary`.
+    static let hoverWash = Color.primary.opacity(0.08)
+    static let hoverWashStrong = Color.primary.opacity(0.14)
 }
 
 extension Font {
@@ -53,6 +91,20 @@ extension Font {
 
     static func ndMono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .monospaced)
+    }
+
+    /// Instrument-panel label — Space Mono caps. Pair with `.tracking(0.8)` + `.uppercased()`.
+    static func ndLabel(_ size: CGFloat = 11) -> Font {
+        .system(size: size, weight: .medium, design: .monospaced)
+    }
+}
+
+extension View {
+    /// A Nothing-style ALL-CAPS monospace label with mechanical tracking.
+    func ndLabelStyle() -> some View {
+        self.font(.ndLabel())
+            .tracking(0.9)
+            .textCase(.uppercase)
     }
 }
 

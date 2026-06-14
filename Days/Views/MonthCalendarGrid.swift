@@ -1,8 +1,12 @@
 import SwiftUI
 
+private let cellCorner: CGFloat = 7
+
 struct MonthCalendarGrid: View {
     @EnvironmentObject private var model: DaysModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @Namespace private var glassSelectionNamespace
 
     private let weekdays = ["一", "二", "三", "四", "五", "六", "日"]
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
@@ -10,44 +14,80 @@ struct MonthCalendarGrid: View {
     var body: some View {
         VStack(spacing: 6) {
             LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(weekdays, id: \.self) { weekday in
+                ForEach(Array(weekdays.enumerated()), id: \.offset) { index, weekday in
                     Text(weekday)
                         .font(.ndMono(11, weight: .medium))
-                        .foregroundStyle(ND.textSecondary(colorScheme))
+                        .foregroundStyle(isWeekend(index) ? ND.textSecondary(colorScheme) : ND.textDisabled(colorScheme))
                         .frame(maxWidth: .infinity, minHeight: 20)
                 }
             }
 
-            LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(model.visibleDays) { day in
-                    DayCellView(
-                        day: day,
-                        holidays: model.holidays(on: day.date),
-                        isSelected: CalendarMath.isSameDay(day.date, model.selectedDate),
-                        isToday: CalendarMath.isSameDay(day.date, Date()),
-                        theme: model.settings.calendarTheme
-                    ) {
+            if isGlassSkin, #available(macOS 26.0, *) {
+                GlassEffectContainer(spacing: 4) {
+                    dayGrid
+                }
+            } else {
+                dayGrid
+            }
+        }
+    }
+
+    private var dayGrid: some View {
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(model.visibleDays) { day in
+                DayCellView(
+                    day: day,
+                    holidays: model.holidays(on: day.date),
+                    isSelected: CalendarMath.isSameDay(day.date, model.selectedDate),
+                    isToday: CalendarMath.isSameDay(day.date, Date()),
+                    isWeekend: CalendarMath.isWeekend(day.date),
+                    theme: model.settings.calendarTheme,
+                    glassNamespace: glassSelectionNamespace
+                ) {
+                    withAnimation(.easeOut(duration: 0.18)) {
                         model.select(day.date)
                     }
                 }
             }
         }
     }
+
+    private func isWeekend(_ index: Int) -> Bool {
+        // firstWeekday is Monday, so columns 5 (六) and 6 (日) are the weekend.
+        index >= 5
+    }
 }
 
 private struct DayCellView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
     @State private var isHovering = false
 
     let day: DayCell
     let holidays: [Holiday]
     let isSelected: Bool
     let isToday: Bool
+    let isWeekend: Bool
     let theme: CalendarTheme
+    let glassNamespace: Namespace.ID
     let action: () -> Void
+
+    /// In glass mode, the selected day is a shared Liquid Glass lens that moves
+    /// between dates instead of repainting a flat highlight in each cell.
+    private var usesGlassLens: Bool {
+        if isGlassSkin, isSelected, #available(macOS 26.0, *) {
+            return true
+        }
+        return false
+    }
 
     private var primaryHoliday: Holiday? {
         holidays.first { $0.kind == .holiday } ?? holidays.first { $0.kind == .workday } ?? holidays.first
+    }
+
+    /// Background for an unmarked day — weekends get a subtle shaded band.
+    private var normalFill: Color {
+        isWeekend ? ND.weekendFill(colorScheme) : ND.dayFill(colorScheme)
     }
 
     var body: some View {
@@ -91,16 +131,38 @@ private struct DayCellView: View {
             }
             .padding(6)
             .frame(maxWidth: .infinity, minHeight: 47, maxHeight: 47, alignment: .topLeading)
-            .background(background)
-            .overlay {
-                Rectangle()
-                    .stroke(borderColor, lineWidth: borderWidth)
-            }
+            .background(cellBackground)
+            .clipShape(RoundedRectangle(cornerRadius: cellCorner))
+            .overlay { cellBorder }
             .opacity(day.isInDisplayedMonth ? 1 : 0.38)
             .animation(.easeOut(duration: 0.14), value: isHovering)
+            .animation(.easeOut(duration: 0.14), value: isSelected)
         }
         .buttonStyle(.plain)
         .pointingHandOnHover($isHovering)
+    }
+
+    @ViewBuilder
+    private var cellBackground: some View {
+        if usesGlassLens, #available(macOS 26.0, *) {
+            Color.clear.glassEffect(
+                .regular.interactive(),
+                in: .rect(cornerRadius: cellCorner)
+            )
+            .glassEffectID("selected-day", in: glassNamespace)
+        } else {
+            background
+        }
+    }
+
+    @ViewBuilder
+    private var cellBorder: some View {
+        if usesGlassLens {
+            EmptyView()
+        } else {
+            RoundedRectangle(cornerRadius: cellCorner)
+                .stroke(borderColor, lineWidth: borderWidth)
+        }
     }
 
     private var dayColor: Color {
@@ -156,16 +218,16 @@ private struct DayCellView: View {
         }
 
         guard let primaryHoliday else {
-            return Color.white.opacity(0.34)
+            return normalFill
         }
 
         switch primaryHoliday.kind {
         case .holiday:
-            return ND.accent.opacity(0.17)
+            return ND.accent.opacity(colorScheme == .dark ? 0.22 : 0.17)
         case .workday:
-            return ND.warning.opacity(0.22)
+            return ND.warning.opacity(colorScheme == .dark ? 0.24 : 0.22)
         case .observance:
-            return Color.white.opacity(0.40)
+            return ND.dayFillStrong(colorScheme)
         }
     }
 
@@ -193,21 +255,25 @@ private struct DayCellView: View {
     }
 
     private var softBackground: Color {
+        if isHovering && primaryHoliday == nil {
+            return hoverFillColor
+        }
+
         if isToday {
             return hoverFillColor
         }
 
         guard let primaryHoliday else {
-            return Color.white.opacity(0.34)
+            return normalFill
         }
 
         switch primaryHoliday.kind {
         case .holiday:
-            return ND.accent.opacity(0.10)
+            return ND.accent.opacity(colorScheme == .dark ? 0.14 : 0.10)
         case .workday:
-            return ND.warning.opacity(0.13)
+            return ND.warning.opacity(colorScheme == .dark ? 0.16 : 0.13)
         case .observance:
-            return Color.white.opacity(0.34)
+            return ND.dayFill(colorScheme)
         }
     }
 
@@ -240,11 +306,11 @@ private struct DayCellView: View {
     }
 
     private var selectedFillColor: Color {
-        Color.primary.opacity(0.16)
+        Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.16)
     }
 
     private var hoverFillColor: Color {
-        Color.primary.opacity(0.09)
+        Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.09)
     }
 
     private func tagColor(for kind: HolidayKind) -> Color {

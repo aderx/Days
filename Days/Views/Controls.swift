@@ -3,6 +3,8 @@ import SwiftUI
 
 struct ControlButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @State private var isHovering = false
 
     let title: String
     let systemImage: String?
@@ -27,18 +29,23 @@ struct ControlButton: View {
             .foregroundStyle(ND.textPrimary(colorScheme))
             .padding(.horizontal, 12)
             .frame(height: 34)
-            .background(.clear)
+            .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Capsule())
             .overlay {
-                Capsule()
-                    .stroke(ND.borderVisible(colorScheme), lineWidth: 1)
+                if !isGlassSkin {
+                    Capsule()
+                        .stroke(ND.borderVisible(colorScheme), lineWidth: 1)
+                }
             }
         }
         .buttonStyle(.plain)
+        .pointingHandOnHover($isHovering)
     }
 }
 
 struct IconControlButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @State private var isHovering = false
 
     let systemImage: String
     let action: () -> Void
@@ -49,17 +56,23 @@ struct IconControlButton: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(ND.textPrimary(colorScheme))
                 .frame(width: 34, height: 34)
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Circle())
                 .overlay {
-                    Circle()
-                        .stroke(ND.borderVisible(colorScheme), lineWidth: 1)
+                    if !isGlassSkin {
+                        Circle()
+                            .stroke(ND.borderVisible(colorScheme), lineWidth: 1)
+                    }
                 }
         }
         .buttonStyle(.plain)
+        .pointingHandOnHover($isHovering)
     }
 }
 
 struct GhostIconButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @State private var isHovering = false
 
     let systemImage: String
     let action: () -> Void
@@ -70,9 +83,11 @@ struct GhostIconButton: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(ND.textSecondary(colorScheme))
                 .frame(width: 30, height: 30)
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Circle())
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .pointingHandOnHover($isHovering)
     }
 }
 
@@ -83,6 +98,7 @@ struct SoftIconButton: View {
     }
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
     @State private var isHovering = false
 
     let systemImage: String
@@ -96,6 +112,7 @@ struct SoftIconButton: View {
                 .foregroundStyle(foreground)
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
+                .glassControlBackground(isGlass: isGlassSkin, isHovering: isHovering, shape: Circle())
                 .opacity(isHovering ? 1 : 0.86)
                 .animation(.easeOut(duration: 0.14), value: isHovering)
         }
@@ -135,8 +152,48 @@ extension View {
     }
 }
 
+// MARK: - Liquid Glass skin propagation
+
+private struct GlassSkinKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// True when the panel skin is the macOS 26 Liquid Glass treatment.
+    var isGlassSkin: Bool {
+        get { self[GlassSkinKey.self] }
+        set { self[GlassSkinKey.self] = newValue }
+    }
+}
+
+/// Backs a small control with a Liquid Glass capsule/circle when the glass skin
+/// is active, otherwise falls back to the flat hover wash.
+struct GlassControlBackground<S: Shape>: ViewModifier {
+    let isGlass: Bool
+    let isHovering: Bool
+    let shape: S
+
+    func body(content: Content) -> some View {
+        if isGlass, #available(macOS 26.0, *) {
+            content.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            content
+                .background(isHovering ? ND.hoverWash : Color.clear)
+                .clipShape(shape)
+        }
+    }
+}
+
+extension View {
+    func glassControlBackground(isGlass: Bool, isHovering: Bool, shape: some Shape) -> some View {
+        modifier(GlassControlBackground(isGlass: isGlass, isHovering: isHovering, shape: shape))
+    }
+}
+
 struct StepTextButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isGlassSkin) private var isGlassSkin
+    @State private var isHovering = false
 
     let title: String
     let action: () -> Void
@@ -147,12 +204,20 @@ struct StepTextButton: View {
                 .font(.ndMono(13, weight: .medium))
                 .foregroundStyle(ND.textSecondary(colorScheme))
                 .frame(width: 30, height: 28)
+                .glassControlBackground(
+                    isGlass: isGlassSkin,
+                    isHovering: isHovering,
+                    shape: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(ND.border(colorScheme), lineWidth: 1)
+                    if !isGlassSkin {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(ND.border(colorScheme), lineWidth: 1)
+                    }
                 }
         }
         .buttonStyle(.plain)
+        .pointingHandOnHover($isHovering)
     }
 }
 

@@ -1,6 +1,44 @@
 import AppKit
 import Combine
+import ServiceManagement
 import SwiftUI
+
+/// Manages the "launch at login" state via the system ServiceManagement framework.
+@MainActor
+enum LoginItemManager {
+    static var isEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    @discardableResult
+    static func setEnabled(_ enabled: Bool) -> Bool {
+        do {
+            if enabled {
+                if SMAppService.mainApp.status != .enabled {
+                    try SMAppService.mainApp.register()
+                }
+            } else if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            NSLog("Days: login item update failed — \(error.localizedDescription)")
+        }
+        return isEnabled
+    }
+}
+
+extension AppearanceMode {
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return NSAppearance(named: .aqua)
+        case .dark:
+            return NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 @main
 final class DaysApp {
@@ -54,6 +92,7 @@ final class StatusBarController: NSObject {
             .sink { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.updateStatusItem()
+                    self?.applyAppearance()
                 }
             }
             .store(in: &cancellables)
@@ -65,6 +104,19 @@ final class StatusBarController: NSObject {
         }
 
         updateStatusItem()
+        applyAppearance()
+    }
+
+    private var appliedAppearance: AppearanceMode?
+
+    /// Drives every Days window's light/dark appearance from the user's choice.
+    private func applyAppearance() {
+        let mode = model.settings.appearanceMode
+        guard mode != appliedAppearance else {
+            return
+        }
+        appliedAppearance = mode
+        NSApp.appearance = mode.nsAppearance
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
@@ -179,20 +231,29 @@ final class StatusBarController: NSObject {
         )
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
 
         let content = CalendarPanelContainerView(contentSize: panelContentSize, arrowHeight: panelArrowHeight)
             .environmentObject(model)
-        let hostingController = NSHostingController(rootView: content)
-        hostingController.view.frame = NSRect(origin: .zero, size: panelSize)
-        hostingController.view.setFrameSize(panelSize)
-        hostingController.view.wantsLayer = true
-        hostingController.view.layer?.backgroundColor = NSColor.clear.cgColor
-        hostingController.view.layoutSubtreeIfNeeded()
-        panel.contentViewController = hostingController
+        let hostingView = ScrollableHostingView(rootView: content)
+        hostingView.frame = NSRect(origin: .zero, size: panelSize)
+        hostingView.autoresizingMask = [.width, .height]
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        hostingView.onScrollStep = { [weak self] step in
+            guard let self else {
+                return
+            }
+            Task { @MainActor in
+                withAnimation(.easeOut(duration: 0.16)) {
+                    self.model.changeSelectedMonth(by: step)
+                }
+            }
+        }
+        panel.contentView = hostingView
 
         self.panel = panel
         return panel
@@ -209,28 +270,6 @@ final class StatusBarController: NSObject {
 
     private func installPanelEventMonitors() {
         removePanelEventMonitors()
-
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            if self?.eventIsInStatusButton(event) == true {
-                return event
-            }
-
-            Task { @MainActor in
-                guard let self, let panel = self.panel, panel.isVisible, event.window !== panel else {
-                    return
-                }
-
-                self.closePanel()
-            }
-
-            return event
-        }
-
-        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in
-                self?.closePanel()
-            }
-        }
     }
 
     private func eventIsInStatusButton(_ event: NSEvent) -> Bool {
@@ -470,29 +509,85 @@ private final class CalendarPanelWindow: NSPanel {
     }
 }
 
+/// Hosting view that turns vertical scroll-wheel gestures over the panel into
+/// month steps. Throttled so a single swipe advances roughly one month.
+final class ScrollableHostingView<Content: View>: NSHostingView<Content> {
+    var onScrollStep: ((Int) -> Void)?
+
+    private var accumulated: CGFloat = 0
+    private var lastStepAt = Date.distantPast
+
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard abs(event.scrollingDeltaY) >= abs(event.scrollingDeltaX) else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        accumulated += event.scrollingDeltaY
+        let now = Date()
+        let threshold: CGFloat = 8
+
+        if abs(accumulated) >= threshold, now.timeIntervalSince(lastStepAt) > 0.18 {
+            let step = accumulated > 0 ? -1 : 1
+            accumulated = 0
+            lastStepAt = now
+            onScrollStep?(step)
+        }
+    }
+}
+
 private struct CalendarPanelContainerView: View {
+    @EnvironmentObject private var model: DaysModel
+    @Environment(\.colorScheme) private var colorScheme
+
     let contentSize: NSSize
     let arrowHeight: CGFloat
 
-    var body: some View {
-        ZStack(alignment: .top) {
-            PanelBubbleShape(arrowHeight: arrowHeight, cornerRadius: 24)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    PanelBubbleShape(arrowHeight: arrowHeight, cornerRadius: 24)
-                        .fill(Color.white.opacity(0.22))
-                }
-                .overlay {
-                    PanelBubbleShape(arrowHeight: arrowHeight, cornerRadius: 24)
-                        .stroke(Color.black.opacity(0.15), lineWidth: 0.8)
-                }
+    private var isGlass: Bool {
+        model.settings.panelSkin == .glass && PanelSkin.glassAvailable
+    }
 
-            CalendarPanelView()
-                .frame(width: contentSize.width, height: contentSize.height, alignment: .topLeading)
-                .padding(.top, arrowHeight)
+    var body: some View {
+        let shape = PanelBubbleShape(arrowHeight: arrowHeight, cornerRadius: 24)
+
+        ZStack(alignment: .top) {
+            panelBackground(shape)
+
+            panelContent
         }
         .frame(width: contentSize.width, height: contentSize.height + arrowHeight)
-        .environment(\.colorScheme, .light)
+    }
+
+    @ViewBuilder
+    private func panelBackground(_ shape: PanelBubbleShape) -> some View {
+        if isGlass, #available(macOS 26.0, *) {
+            Color.clear
+                .frame(width: contentSize.width, height: contentSize.height + arrowHeight)
+                .glassEffect(.regular, in: shape)
+                .allowsHitTesting(false)
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    shape.fill(ND.panelChromeFill(colorScheme))
+                }
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var panelContent: some View {
+        CalendarPanelView()
+            .frame(width: contentSize.width, height: contentSize.height, alignment: .topLeading)
+            .padding(.top, arrowHeight)
     }
 }
 
@@ -507,7 +602,6 @@ private struct PanelBubbleShape: Shape {
         let radius = min(cornerRadius, rect.width / 2, (rect.height - arrowHeight) / 2)
 
         var path = Path()
-
         path.move(to: CGPoint(x: arrowPeakX, y: rect.minY))
         path.addCurve(
             to: CGPoint(x: arrowPeakX + arrowHalfWidth, y: bodyTop),
